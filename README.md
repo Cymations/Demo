@@ -1,2 +1,2 @@
 # Agile
-Course material learning Agile concepts 
+Content for demonstrating Agile and DevOps concepts 
