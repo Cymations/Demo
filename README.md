@@ -1,2 +1,2 @@
 # Demo
-Content for demonstrating Agile and DevOps concepts 
+Content for demonstrating Agile and DevOps concepts.
