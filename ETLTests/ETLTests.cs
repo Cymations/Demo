@@ -40,6 +40,28 @@ namespace ETLTests
             }
         }
 
+        [Theory]
+        [InlineData("20230101-0001", true, null)] // Correct format
+        [InlineData("20231301-0001", false, "Invalid date.")] // Invalid month
+        [InlineData("20230230-0001", false, "Invalid date.")] // Invalid day
+        [InlineData("20230101-99999", false, "Invalid sequence. Must be a 4-digit number between 0001 and 9999.")] // Sequence too long
+        [InlineData("InvalidBatchId", false, "Invalid format. Expected yyyyMMdd-SSSS.")] // Completely invalid format
+        public void ValidateBatchId_ShouldHandleVariousCases(string batchId, bool expectedIsValid, string expectedError)
+        {
+            // Arrange
+            var transform = new Transform();
+
+            // Act
+            var result = transform.ValidateBatchId(batchId);
+
+            // Assert
+            Assert.Equal(expectedIsValid, result.IsValid);
+            if (!expectedIsValid && expectedError != null)
+            {
+                Assert.Contains(expectedError, result.Errors);
+            }
+        }
+
         public static IEnumerable<object[]> NormalizeBatchIdTestData => new List<object[]>
         {
             new object[] { "20230101-0001", "20230101-0001" }, // Already uppercase
@@ -113,6 +135,70 @@ namespace ETLTests
                 Assert.Single(result);
                 Assert.Equal("Value1", result[0]["Header1"]);
                 Assert.Equal("Value2", result[0]["Header2"]);
+            }
+            finally
+            {
+                System.IO.File.Delete(filePath);
+            }
+        }
+
+        [Fact]
+        public void LoadCsv_ShouldHandleMultipleColumnsPerRow()
+        {
+            // Arrange
+            var extract = new Extract();
+            var filePath = "test_multiple_columns.csv";
+            System.IO.File.WriteAllLines(filePath, new[]
+            {
+                "Column1,Column2,Column3",
+                "Value1,Value2,Value3",
+                "Data1,Data2,Data3"
+            });
+
+            try
+            {
+                // Act
+                var result = extract.LoadCsv(filePath);
+
+                // Assert
+                Assert.Equal(2, result.Count); // Two rows of data
+                Assert.Equal("Value1", result[0]["Column1"]);
+                Assert.Equal("Value2", result[0]["Column2"]);
+                Assert.Equal("Value3", result[0]["Column3"]);
+                Assert.Equal("Data1", result[1]["Column1"]);
+                Assert.Equal("Data2", result[1]["Column2"]);
+                Assert.Equal("Data3", result[1]["Column3"]);
+            }
+            finally
+            {
+                System.IO.File.Delete(filePath);
+            }
+        }
+
+        [Fact]
+        public void LoadCsv_ShouldValidateFirstColumnAsBatchId()
+        {
+            // Arrange
+            var extract = new Extract();
+            var transform = new Transform();
+            var filePath = "test_validate_batchid.csv";
+            System.IO.File.WriteAllLines(filePath, new[]
+            {
+                "BatchId,Column2,Column3",
+                "20230101-0001,Value2,Value3",
+                "InvalidBatchId,Data2,Data3"
+            });
+
+            try
+            {
+                // Act
+                var result = extract.LoadCsv(filePath);
+                var validationResults = result.Select(row => transform.ValidateBatchId(row["BatchId"])).ToList();
+
+                // Assert
+                Assert.True(validationResults[0].IsValid); // First row has a valid BatchId
+                Assert.False(validationResults[1].IsValid); // Second row has an invalid BatchId
+                Assert.Contains("Invalid format. Expected yyyyMMdd-SSSS.", validationResults[1].Errors);
             }
             finally
             {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace ETL
 {
@@ -23,6 +24,40 @@ namespace ETL
                                              .Zip(headers, (value, header) => new { header, value })
                                              .ToDictionary(x => x.header, x => x.value))
                         .ToList();
+        }
+
+        public List<Dictionary<string, string>> LoadJSON(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("The specified file does not exist.", filePath);
+            }
+
+            try
+            {
+                var jsonContent = File.ReadAllText(filePath);
+                var data = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(jsonContent);
+
+                if (data == null)
+                {
+                    throw new InvalidOperationException("Failed to parse JSON data.");
+                }
+
+                // Convert object values to string
+                return data.Select(row => row.ToDictionary(
+                    kv => kv.Key,
+                    kv => kv.Value?.ToString() ?? string.Empty
+                )).ToList();
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException("Error parsing JSON file.", ex);
+            }
         }
     }
 
@@ -56,6 +91,45 @@ namespace ETL
             return (validRows, rejectReport);
         }
 
+        /// <summary>
+        /// Validates a batch ID for correct format, date, and sequence.
+        /// </summary>
+        /// <param name="batchId">The batch ID to validate. Expected format: yyyyMMdd-SSSS.</param>
+        /// <returns>
+        /// A tuple containing:
+        /// <list type="bullet">
+        /// <item><description><c>IsValid</c>: <see langword="true"/> if the batch ID is valid; otherwise, <see langword="false"/>.</description></item>
+        /// <item><description><c>Errors</c>: A list of error messages explaining validation failures.</description></item>
+        /// <item><description><c>DebugInfo</c>: Debugging information for logging purposes.</description></item>
+        /// </list>
+        /// </returns>
+        /// <remarks>
+        /// This method checks the following:
+        /// <list type="bullet">
+        /// <item><description>Format: The batch ID must be 13 characters long and include a hyphen at position 9.</description></item>
+        /// <item><description>Date: The first 8 characters must represent a valid date in yyyyMMdd format.</description></item>
+        /// <item><description>Sequence: The last 4 characters must be a number between 0001 and 9999.</description></item>
+        /// </list>
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// var transform = new Transform();
+        /// var result = transform.ValidateBatchId("20230101-0001");
+        /// Console.WriteLine(result.IsValid); // Output: true
+        /// </code>
+        /// <code>
+        /// var transform = new Transform();
+        /// var result = transform.ValidateBatchId("20231301-0000");
+        /// Console.WriteLine(string.Join(", ", result.Errors)); // Output: Invalid date., Invalid sequence. Must be a 4-digit number between 0001 and 9999.
+        /// </code>
+        /// </example>
+        /// <errors>
+        /// <list type="bullet">
+        /// <item><description><c>Invalid format. Expected yyyyMMdd-SSSS.</c>: The batch ID does not match the required format.</description></item>
+        /// <item><description><c>Invalid date.</c>: The date portion of the batch ID is not a valid calendar date.</description></item>
+        /// <item><description><c>Invalid sequence. Must be a 4-digit number between 0001 and 9999.</c>: The sequence portion is not within the valid range.</description></item>
+        /// </list>
+        /// </errors>
         public (bool IsValid, List<string> Errors, string DebugInfo) ValidateBatchId(string batchId)
         {
             var errors = new List<string>();
@@ -77,6 +151,34 @@ namespace ETL
         public string NormalizeBatchId(string batchId)
         {
             return batchId.ToUpperInvariant();
+        }
+
+        public List<Dictionary<string, object>> TransformData(List<Dictionary<string, object>> data)
+        {
+            return data.Select(row =>
+            {
+                var transformedRow = new Dictionary<string, object>(row);
+                if (row.ContainsKey("BatchId"))
+                {
+                    var batchIdObj = row["BatchId"];
+                    var batchIdStr = batchIdObj?.ToString() ?? string.Empty;
+                    transformedRow["BatchId"] = batchIdStr.ToUpper();
+                }
+                return transformedRow;
+            }).ToList();
+        }
+
+        public List<Dictionary<string, string>> TransformData(List<Dictionary<string, string>> data)
+        {
+            return data.Select(row =>
+            {
+                var transformedRow = new Dictionary<string, string>(row);
+                if (row.TryGetValue("BatchId", out var batchId) && !string.IsNullOrEmpty(batchId))
+                {
+                    transformedRow["BatchId"] = batchId.ToUpper();
+                }
+                return transformedRow;
+            }).ToList();
         }
     }
 
@@ -104,6 +206,14 @@ namespace ETL
                 throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
 
             File.WriteAllLines(filePath, rejectReport);
+        }
+
+        public void LoadData(List<Dictionary<string, string>> data)
+        {
+            foreach (var row in data)
+            {
+                Console.WriteLine(string.Join(", ", row.Select(kv => $"{kv.Key}: {kv.Value}")));
+            }
         }
     }
 
@@ -137,6 +247,26 @@ namespace ETL
             _load.SaveRejectReport(rejectFilePath, rejectReport);
 
             Console.WriteLine("ETL pipeline completed.");
+        }
+
+        public void Run(string csvFilePath, string jsonFilePath)
+        {
+            var extract = new Extract();
+            var transform = new Transform();
+            var load = new Load();
+
+            // Load CSV data
+            var csvData = extract.LoadCsv(csvFilePath);
+
+            // Load JSON data
+            var jsonData = extract.LoadJSON(jsonFilePath);
+
+            // Transform and load data
+            var transformedCsvData = transform.TransformData(csvData);
+            var transformedJsonData = transform.TransformData(jsonData);
+
+            load.LoadData(transformedCsvData);
+            load.LoadData(transformedJsonData);
         }
     }
 }
