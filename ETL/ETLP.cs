@@ -56,7 +56,7 @@ namespace ETL
             return (validRows, rejectReport);
         }
 
-        public (bool IsValid, List<string> Errors) ValidateBatchId(string batchId)
+        public (bool IsValid, List<string> Errors, string DebugInfo) ValidateBatchId(string batchId)
         {
             var errors = new List<string>();
 
@@ -69,7 +69,9 @@ namespace ETL
             if (!int.TryParse(batchId.Substring(9), out var sequence) || sequence < 1 || sequence > 9999)
                 errors.Add("Invalid sequence. Must be a 4-digit number between 0001 and 9999.");
 
-            return (errors.Count == 0, errors);
+            var debugInfo = $"Debugging ValidateBatchId: Errors = {string.Join(", ", errors)}";
+
+            return (errors.Count == 0, errors.OrderBy(e => e).ToList(), debugInfo);
         }
 
         public string NormalizeBatchId(string batchId)
