@@ -65,7 +65,6 @@ namespace ETLTests
         public static IEnumerable<object[]> NormalizeBatchIdTestData => new List<object[]>
         {
             new object[] { "20230101-0001", "20230101-0001" }, // Already uppercase
-            new object[] { "20230101-0001".ToLower(), "20230101-0001" }, // Lowercase input
         };
 
         [Theory]
@@ -115,7 +114,7 @@ namespace ETLTests
         }
 
         [Fact]
-        public void LoadCsv_ShouldLoadDataCorrectly()
+        public void LoadCsv_ShouldDisplayDataCorrectly()
         {
             // Arrange
             var extract = new Extract();

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using CsvHelper;
 
 namespace ETL
 {
@@ -14,16 +15,34 @@ namespace ETL
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
 
-            var lines = File.ReadAllLines(filePath);
-            if (lines.Length < 2)
-                throw new Exception("CSV file must have at least a header and one data row.");
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("The specified file does not exist.", filePath);
 
-            var headers = lines[0].Split(',');
-            return lines.Skip(1)
-                        .Select(line => line.Split(',')
-                                             .Zip(headers, (value, header) => new { header, value })
-                                             .ToDictionary(x => x.header, x => x.value))
-                        .ToList();
+            using var reader = new StreamReader(filePath);
+            using var csv = new CsvReader(reader, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                MissingFieldFound = null,
+                HeaderValidated = null
+            });
+
+            var records = new List<Dictionary<string, string>>();
+            csv.Read();
+            csv.ReadHeader();
+            var headers = csv.HeaderRecord;
+
+            // Check for at least one data row
+            if (!csv.Read())
+                throw new Exception("CSV file must have at least a header and one data row.");
+            do
+            {
+                var dict = new Dictionary<string, string>();
+                foreach (var header in headers)
+                {
+                    dict[header] = csv.GetField(header);
+                }
+                records.Add(dict);
+            } while (csv.Read());
+            return records;
         }
 
         public List<Dictionary<string, string>> LoadJSON(string filePath)
@@ -208,7 +227,7 @@ namespace ETL
             File.WriteAllLines(filePath, rejectReport);
         }
 
-        public void LoadData(List<Dictionary<string, string>> data)
+        public void DisplayData(List<Dictionary<string, string>> data)
         {
             foreach (var row in data)
             {
@@ -265,8 +284,8 @@ namespace ETL
             var transformedCsvData = transform.TransformData(csvData);
             var transformedJsonData = transform.TransformData(jsonData);
 
-            load.LoadData(transformedCsvData);
-            load.LoadData(transformedJsonData);
+            load.DisplayData(transformedCsvData);
+            load.DisplayData(transformedJsonData);
         }
     }
 }
