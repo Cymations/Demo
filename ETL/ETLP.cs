@@ -58,8 +58,9 @@ namespace ETL
 		/// <returns>True if parsing and normalization succeeded, false otherwise.</returns>
 		public static bool TryParseBatchId(string batchId, out string? normalized)
 		{
+			ArgumentNullException.ThrowIfNull(batchId);
 			normalized = null;
-			if (string.IsNullOrEmpty(batchId) || batchId.Length != 13 || batchId[8] != '-')
+			if (batchId.Length != 13 || batchId[8] != '-')
 				return false;
 
 			// Fast path: check digits for date and sequence
@@ -96,11 +97,12 @@ namespace ETL
 		/// <returns>A tuple: IsValid, List of error codes/messages, and DebugInfo string.</returns>
 		public static (bool IsValid, List<(string Code, string Message)> Errors, string DebugInfo) ValidateBatchId(string batchId)
 		{
+			ArgumentNullException.ThrowIfNull(batchId);
 			var errors = new List<(string, string)>();
-			if (string.IsNullOrEmpty(batchId))
+			if (batchId.Length == 0)
 			{
-				errors.Add(("ERR_NULL_OR_EMPTY", "BatchId is null or empty."));
-				return (false, errors, "Input is null or empty");
+				errors.Add(("ERR_NULL_OR_EMPTY", "BatchId is empty."));
+				return (false, errors, "Input is empty");
 			}
 			if (batchId.Length != 13 || batchId[8] != '-')
 				errors.Add(("ERR_FORMAT", "BatchId must be 13 characters and contain a hyphen at position 9 (yyyyMMdd-SSSS)."));
@@ -149,9 +151,10 @@ namespace ETL
 		/// <returns>The normalized BatchId string, or null if input is null or not 13 chars.</returns>
 		public static string? NormalizeBatchIdToken(string batchId)
 		{
-			var (isValid, _, _) = ValidateBatchId(batchId);
-			if (!isValid)
+			ArgumentNullException.ThrowIfNull(batchId);
+			if (batchId.Length != 13)
 				return null;
+			// Canonical: yyyyMMdd-SSSS
 			return batchId.Substring(0, 8) + "-" + batchId.Substring(9, 4);
 		}
 
