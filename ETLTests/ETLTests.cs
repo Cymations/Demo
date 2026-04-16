@@ -120,4 +120,3 @@ public class BatchIdTests
 		Assert.Throws<ArgumentNullException>(() => Transform.NormalizeBatchIdToken(null!));
 	}
 }
-// This file is intentionally left empty to resolve file not found errors and allow the build to succeed.
