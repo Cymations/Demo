@@ -69,6 +69,9 @@ public class BatchIdTests
 		   new object[] { "        -0001", "        -0001" },
 	   };
 
+	/// <summary>
+	/// Tests that valid BatchId inputs are parsed and normalized correctly.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(ValidBatchIds))]
 	public void TryParseBatchId_WithValidInput_ReturnsTrueAndNormalized(string input, string expectedNormalized)
@@ -78,6 +81,9 @@ public class BatchIdTests
 		Assert.Equal(expectedNormalized, normalized);
 	}
 
+	/// <summary>
+	/// Tests that invalid BatchId inputs return false or throw for null.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(InvalidBatchIds))]
 	public void TryParseBatchId_WithInvalidInput_ReturnsFalseOrThrows(string input, string[] _)
@@ -94,6 +100,9 @@ public class BatchIdTests
 		}
 	}
 
+	/// <summary>
+	/// Tests that null input throws ArgumentNullException for TryParseBatchId.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(NullBatchIds))]
 	public void TryParseBatchId_WithNullInput_ThrowsArgumentNullException(string input, string[] _)
@@ -101,6 +110,9 @@ public class BatchIdTests
 		Assert.Throws<ArgumentNullException>(() => Transform.TryParseBatchId(input!, out var _));
 	}
 
+	/// <summary>
+	/// Tests that empty input returns false for TryParseBatchId.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(EmptyBatchIds))]
 	public void TryParseBatchId_WithEmptyInput_ReturnsFalse(string input, string[] _)
@@ -110,6 +122,9 @@ public class BatchIdTests
 		Assert.Null(normalized);
 	}
 
+	/// <summary>
+	/// Tests that valid BatchId inputs are normalized correctly.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(ValidBatchIds))]
 	public void NormalizeBatchIdToken_WithValidInput_ReturnsNormalized(string input, string expectedNormalized)
@@ -118,6 +133,9 @@ public class BatchIdTests
 		Assert.Equal(expectedNormalized, normalized);
 	}
 
+	/// <summary>
+	/// Tests that invalid BatchId inputs return null or throw for null in normalization.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(InvalidBatchIds))]
 	public void NormalizeBatchIdToken_WithInvalidInput_ReturnsNullOrThrows(string input, string[] _)
@@ -138,6 +156,9 @@ public class BatchIdTests
 		}
 	}
 
+	/// <summary>
+	/// Tests that null input throws ArgumentNullException for NormalizeBatchIdToken.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(NullBatchIds))]
 	public void NormalizeBatchIdToken_WithNullInput_ThrowsArgumentNullException(string input, string[] _)
@@ -145,6 +166,9 @@ public class BatchIdTests
 		Assert.Throws<ArgumentNullException>(() => Transform.NormalizeBatchIdToken(input!));
 	}
 
+	/// <summary>
+	/// Tests that empty input returns null for NormalizeBatchIdToken.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(EmptyBatchIds))]
 	public void NormalizeBatchIdToken_WithEmptyInput_ReturnsNull(string input, string[] _)
@@ -153,6 +177,9 @@ public class BatchIdTests
 		Assert.Null(normalized);
 	}
 
+	/// <summary>
+	/// Tests that valid BatchId inputs are validated as valid.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(ValidBatchIds))]
 	public void ValidateBatchId_WithValidInput_ReturnsValid(string input, string _)
@@ -163,6 +190,9 @@ public class BatchIdTests
 		Assert.Contains("Checked BatchId", debug);
 	}
 
+	/// <summary>
+	/// Tests that invalid BatchId inputs return errors or throw for null.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(InvalidBatchIds))]
 	public void ValidateBatchId_WithInvalidInput_ReturnsErrorsOrThrows(string input, string[] expectedErrorCodes)
@@ -186,6 +216,9 @@ public class BatchIdTests
 		}
 	}
 
+	/// <summary>
+	/// Tests that null input throws ArgumentNullException for ValidateBatchId.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(NullBatchIds))]
 	public void ValidateBatchId_WithNullInput_ThrowsArgumentNullException(string input, string[] _)
@@ -193,6 +226,9 @@ public class BatchIdTests
 		Assert.Throws<ArgumentNullException>(() => Transform.ValidateBatchId(input!));
 	}
 
+	/// <summary>
+	/// Tests that empty input returns errors for ValidateBatchId.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(EmptyBatchIds))]
 	public void ValidateBatchId_WithEmptyInput_ReturnsErrors(string input, string[] expectedErrorCodes)
@@ -206,6 +242,9 @@ public class BatchIdTests
 		Assert.Contains("Input is empty", debug);
 	}
 
+	/// <summary>
+	/// Tests that boundary BatchId values are parsed, normalized, and validated correctly.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(BoundaryBatchIds))]
 	public void TryParseBatchId_WithBoundaryValues_ReturnsTrueAndNormalized(string input, string expectedNormalized)
@@ -233,6 +272,9 @@ public class BatchIdTests
 		Assert.Contains("Checked BatchId", debug);
 	}
 
+	/// <summary>
+	/// Tests that whitespace BatchId values are handled as invalid for parsing.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(WhitespaceBatchIds))]
 	public void TryParseBatchId_WithWhitespaceInput_ReturnsFalse(string input, string[] _)
@@ -242,7 +284,9 @@ public class BatchIdTests
 		Assert.Null(normalized);
 	}
 
-
+	/// <summary>
+	/// Tests normalization of whitespace BatchId values.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(WhitespaceBatchIdsForNormalization))]
 	public void NormalizeBatchIdToken_WithWhitespaceInput_ReturnsExpected(string input, string? expected)
@@ -251,6 +295,9 @@ public class BatchIdTests
 		Assert.Equal(expected, normalized);
 	}
 
+	/// <summary>
+	/// Tests that whitespace BatchId values return expected errors for validation.
+	/// </summary>
 	[Theory]
 	[MemberData(nameof(WhitespaceBatchIds))]
 	public void ValidateBatchId_WithWhitespaceInput_ReturnsErrors(string input, string[] expectedErrorCodes)
@@ -263,6 +310,9 @@ public class BatchIdTests
 		}
 	}
 
+	/// <summary>
+	/// Tests that all BatchId methods throw ArgumentNullException on null input.
+	/// </summary>
 	[Fact]
 	public void BatchId_Methods_ThrowArgumentNullException_OnNullInput()
 	{
