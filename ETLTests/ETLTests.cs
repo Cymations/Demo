@@ -14,7 +14,7 @@ public class BatchIdTests
 
 	public static IEnumerable<object[]> InvalidBatchIds => new List<object[]>
 	{
-		new object[] { null, new[] { "ERR_NULL_OR_EMPTY" } },
+		new object[] { null!, new[] { "ERR_NULL_OR_EMPTY" } },
 		new object[] { "", new[] { "ERR_NULL_OR_EMPTY" } },
 		new object[] { "20260406-0000", new[] { "ERR_SEQ_RANGE" } },
 		new object[] { "20260406-10000", new[] { "ERR_FORMAT" } },
@@ -40,7 +40,7 @@ public class BatchIdTests
 	{
 		if (input == null)
 		{
-			Assert.Throws<ArgumentNullException>(() => Transform.TryParseBatchId(input, out var _));
+			Assert.Throws<ArgumentNullException>(() => Transform.TryParseBatchId(input!, out var _));
 		}
 		else
 		{
@@ -64,7 +64,7 @@ public class BatchIdTests
 	{
 		if (input == null)
 		{
-			Assert.Throws<ArgumentNullException>(() => Transform.NormalizeBatchIdToken(input));
+			Assert.Throws<ArgumentNullException>(() => Transform.NormalizeBatchIdToken(input!));
 		}
 		else if (input.Length != 13)
 		{
@@ -95,7 +95,7 @@ public class BatchIdTests
 	{
 		if (input == null)
 		{
-			Assert.Throws<ArgumentNullException>(() => Transform.ValidateBatchId(input));
+			Assert.Throws<ArgumentNullException>(() => Transform.ValidateBatchId(input!));
 		}
 		else
 		{
@@ -115,9 +115,9 @@ public class BatchIdTests
 	[Fact]
 	public void BatchId_Methods_ThrowArgumentNullException_OnNullInput()
 	{
-		Assert.Throws<ArgumentNullException>(() => Transform.TryParseBatchId(null, out var _));
-		Assert.Throws<ArgumentNullException>(() => Transform.ValidateBatchId(null));
-		Assert.Throws<ArgumentNullException>(() => Transform.NormalizeBatchIdToken(null));
+		Assert.Throws<ArgumentNullException>(() => Transform.TryParseBatchId(null!, out var _));
+		Assert.Throws<ArgumentNullException>(() => Transform.ValidateBatchId(null!));
+		Assert.Throws<ArgumentNullException>(() => Transform.NormalizeBatchIdToken(null!));
 	}
 }
 // This file is intentionally left empty to resolve file not found errors and allow the build to succeed.
