@@ -1,291 +1,203 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
-using CsvHelper;
+using System.Threading.Tasks;
 
 namespace ETL
 {
-    public class Extract
-    {
-        public List<Dictionary<string, string>> LoadCsv(string filePath)
-        {
-            if (string.IsNullOrWhiteSpace(filePath))
-                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+	// Interface for extraction
+	public interface IExtractor<T>
+	{
+		IEnumerable<T> Extract(string filePath);
+		// Optionally: IAsyncEnumerable<T> ExtractAsync(string filePath);
+	}
 
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("The specified file does not exist.", filePath);
+	// Interface for transformation
+	public interface ITransformer<TIn, TOut>
+	{
+		IEnumerable<TOut> Transform(IEnumerable<TIn> input);
+	}
 
-            using var reader = new StreamReader(filePath);
-            using var csv = new CsvReader(reader, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                MissingFieldFound = null,
-                HeaderValidated = null
-            });
+	// Interface for loading
+	public interface ILoader<T>
+	{
+		void Load(IEnumerable<T> data, string filePath);
+	}
 
-            var records = new List<Dictionary<string, string>>();
-            csv.Read();
-            csv.ReadHeader();
-            var headers = csv.HeaderRecord;
+	// Extractor for CSV files (skeleton)
+	public class Extract : IExtractor<Dictionary<string, string>>
+	{
+		public IEnumerable<Dictionary<string, string>> LoadCsv(string filePath)
+		{
+			// TODO: Implement CSV extraction logic
+			throw new NotImplementedException();
+		}
 
-            // Check for at least one data row
-            if (!csv.Read())
-                throw new Exception("CSV file must have at least a header and one data row.");
-            do
-            {
-                var dict = new Dictionary<string, string>();
-                foreach (var header in headers)
-                {
-                    dict[header] = csv.GetField(header);
-                }
-                records.Add(dict);
-            } while (csv.Read());
-            return records;
-        }
+		IEnumerable<Dictionary<string, string>> IExtractor<Dictionary<string, string>>.Extract(string filePath)
+		{
+			return LoadCsv(filePath);
+		}
+	}
 
-        public List<Dictionary<string, string>> LoadJSON(string filePath)
-        {
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
-            }
+	// Transformer (skeleton)
+	public class Transform : ITransformer<Dictionary<string, string>, Dictionary<string, string>>
+	{
 
-            if (!File.Exists(filePath))
-            {
-                throw new FileNotFoundException("The specified file does not exist.", filePath);
-            }
+		public IEnumerable<Dictionary<string, string>> TransformData(IEnumerable<Dictionary<string, string>> input)
+		{
+			// TODO: Implement transformation logic
+			throw new NotImplementedException();
+		}
 
-            try
-            {
-                var jsonContent = File.ReadAllText(filePath);
-                var data = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(jsonContent);
 
-                if (data == null)
-                {
-                    throw new InvalidOperationException("Failed to parse JSON data.");
-                }
+		/// <summary>
+		/// Attempts to parse and normalize a BatchId token. Does not throw; returns true if valid, false otherwise.
+		/// </summary>
+		/// <param name="batchId">The input BatchId string (expected format: yyyyMMdd-SSSS).</param>
+		/// <param name="normalized">The normalized BatchId if valid, or null if invalid.</param>
+		/// <returns>True if parsing and normalization succeeded, false otherwise.</returns>
+		public static bool TryParseBatchId(string batchId, out string? normalized)
+		{
+			normalized = null;
+			if (string.IsNullOrEmpty(batchId) || batchId.Length != 13 || batchId[8] != '-')
+				return false;
 
-                // Convert object values to string
-                return data.Select(row => row.ToDictionary(
-                    kv => kv.Key,
-                    kv => kv.Value?.ToString() ?? string.Empty
-                )).ToList();
-            }
-            catch (JsonException ex)
-            {
-                throw new InvalidOperationException("Error parsing JSON file.", ex);
-            }
-        }
-    }
+			// Fast path: check digits for date and sequence
+			for (int i = 0; i < 8; i++)
+				if (batchId[i] < '0' || batchId[i] > '9')
+					return false;
+			for (int i = 9; i < 13; i++)
+				if (batchId[i] < '0' || batchId[i] > '9')
+					return false;
 
-    public class Transform
-    {
-        public (List<Dictionary<string, string>> ValidRows, List<string> RejectReport) ProcessBatchId(
-            List<Dictionary<string, string>> data, string batchIdColumn)
-        {
-            var validRows = new List<Dictionary<string, string>>();
-            var rejectReport = new List<string>();
+			// Validate date
+			int year = (batchId[0] - '0') * 1000 + (batchId[1] - '0') * 100 + (batchId[2] - '0') * 10 + (batchId[3] - '0');
+			int month = (batchId[4] - '0') * 10 + (batchId[5] - '0');
+			int day = (batchId[6] - '0') * 10 + (batchId[7] - '0');
+			if (month < 1 || month > 12 || day < 1 || day > 31)
+				return false;
+			// Use DateTime.TryParseExact for full validation (no allocation)
+			if (!System.DateTime.TryParseExact(batchId.Substring(0, 8), "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out _))
+				return false;
 
-            foreach (var (row, index) in data.Select((row, index) => (row, index + 1)))
-            {
-                if (!row.TryGetValue(batchIdColumn, out var batchId))
-                {
-                    rejectReport.Add($"Row {index}: Missing {batchIdColumn}");
-                    continue;
-                }
+			// Validate sequence
+			int seq = (batchId[9] - '0') * 1000 + (batchId[10] - '0') * 100 + (batchId[11] - '0') * 10 + (batchId[12] - '0');
+			if (seq < 1 || seq > 9999)
+				return false;
 
-                var validationResult = ValidateBatchId(batchId);
-                if (!validationResult.IsValid)
-                {
-                    rejectReport.Add($"Row {index}: {string.Join(", ", validationResult.Errors)}");
-                    continue;
-                }
+			normalized = NormalizeBatchIdToken(batchId);
+			return true;
+		}
 
-                row[batchIdColumn] = NormalizeBatchId(batchId);
-                validRows.Add(row);
-            }
+		/// <summary>
+		/// Validates a BatchId token and returns rich error codes/messages.
+		/// </summary>
+		/// <param name="batchId">The input BatchId string (expected format: yyyyMMdd-SSSS).</param>
+		/// <returns>A tuple: IsValid, List of error codes/messages, and DebugInfo string.</returns>
+		public static (bool IsValid, List<(string Code, string Message)> Errors, string DebugInfo) ValidateBatchId(string batchId)
+		{
+			var errors = new List<(string, string)>();
+			if (string.IsNullOrEmpty(batchId))
+			{
+				errors.Add(("ERR_NULL_OR_EMPTY", "BatchId is null or empty."));
+				return (false, errors, "Input is null or empty");
+			}
+			if (batchId.Length != 13 || batchId[8] != '-')
+				errors.Add(("ERR_FORMAT", "BatchId must be 13 characters and contain a hyphen at position 9 (yyyyMMdd-SSSS)."));
+			for (int i = 0; i < 8 && batchId.Length > i; i++)
+				if (batchId[i] < '0' || batchId[i] > '9')
+					errors.Add(("ERR_DATE_DIGIT", $"Character {i + 1} of BatchId must be a digit."));
+			for (int i = 9; i < 13 && batchId.Length > i; i++)
+				if (batchId[i] < '0' || batchId[i] > '9')
+					errors.Add(("ERR_SEQ_DIGIT", $"Character {i + 1} of BatchId must be a digit."));
+			if (batchId.Length >= 8)
+			{
+				int year = 0, month = 0, day = 0;
+				if (batchId.Length >= 4)
+					year = (batchId[0] - '0') * 1000 + (batchId[1] - '0') * 100 + (batchId[2] - '0') * 10 + (batchId[3] - '0');
+				if (batchId.Length >= 6)
+					month = (batchId[4] - '0') * 10 + (batchId[5] - '0');
+				if (batchId.Length >= 8)
+					day = (batchId[6] - '0') * 10 + (batchId[7] - '0');
+				if (month < 1 || month > 12)
+					errors.Add(("ERR_MONTH", "Month must be between 01 and 12."));
+				if (day < 1 || day > 31)
+					errors.Add(("ERR_DAY", "Day must be between 01 and 31."));
+				if (batchId.Length >= 8 && !System.DateTime.TryParseExact(batchId.Substring(0, 8), "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out _))
+					errors.Add(("ERR_DATE", "Date portion is not a valid calendar date."));
+			}
+			if (batchId.Length >= 13)
+			{
+				int seq = (batchId[9] - '0') * 1000 + (batchId[10] - '0') * 100 + (batchId[11] - '0') * 10 + (batchId[12] - '0');
+				if (seq < 1 || seq > 9999)
+					errors.Add(("ERR_SEQ_RANGE", "Sequence must be between 0001 and 9999."));
+			}
+			var debug = $"Checked BatchId: {batchId}, Errors: {string.Join(", ", errors)}";
+			return (errors.Count == 0, errors, debug);
+		}
 
-            return (validRows, rejectReport);
-        }
+		/// <summary>
+		/// Normalizes a BatchId token to the canonical format (yyyyMMdd-SSSS, upper-case, zero-padded sequence).
+		/// </summary>
+		/// <param name="batchId">The input BatchId string.</param>
+		/// <returns>The normalized BatchId string, or null if input is invalid.</returns>
+		/// <summary>
+		/// Normalizes a BatchId token to the canonical format (yyyyMMdd-SSSS, upper-case, zero-padded sequence).
+		/// Assumes input is valid. Does not perform validation.
+		/// </summary>
+		/// <param name="batchId">The input BatchId string (must be valid).</param>
+		/// <returns>The normalized BatchId string, or null if input is null or not 13 chars.</returns>
+		public static string? NormalizeBatchIdToken(string batchId)
+		{
+			var (isValid, _, _) = ValidateBatchId(batchId);
+			if (!isValid)
+				return null;
+			return batchId.Substring(0, 8) + "-" + batchId.Substring(9, 4);
+		}
 
-        /// <summary>
-        /// Validates a batch ID for correct format, date, and sequence.
-        /// </summary>
-        /// <param name="batchId">The batch ID to validate. Expected format: yyyyMMdd-SSSS.</param>
-        /// <returns>
-        /// A tuple containing:
-        /// <list type="bullet">
-        /// <item><description><c>IsValid</c>: <see langword="true"/> if the batch ID is valid; otherwise, <see langword="false"/>.</description></item>
-        /// <item><description><c>Errors</c>: A list of error messages explaining validation failures.</description></item>
-        /// <item><description><c>DebugInfo</c>: Debugging information for logging purposes.</description></item>
-        /// </list>
-        /// </returns>
-        /// <remarks>
-        /// This method checks the following:
-        /// <list type="bullet">
-        /// <item><description>Format: The batch ID must be 13 characters long and include a hyphen at position 9.</description></item>
-        /// <item><description>Date: The first 8 characters must represent a valid date in yyyyMMdd format.</description></item>
-        /// <item><description>Sequence: The last 4 characters must be a number between 0001 and 9999.</description></item>
-        /// </list>
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// var transform = new Transform();
-        /// var result = transform.ValidateBatchId("20230101-0001");
-        /// Console.WriteLine(result.IsValid); // Output: true
-        /// </code>
-        /// <code>
-        /// var transform = new Transform();
-        /// var result = transform.ValidateBatchId("20231301-0000");
-        /// Console.WriteLine(string.Join(", ", result.Errors)); // Output: Invalid date., Invalid sequence. Must be a 4-digit number between 0001 and 9999.
-        /// </code>
-        /// </example>
-        /// <errors>
-        /// <list type="bullet">
-        /// <item><description><c>Invalid format. Expected yyyyMMdd-SSSS.</c>: The batch ID does not match the required format.</description></item>
-        /// <item><description><c>Invalid date.</c>: The date portion of the batch ID is not a valid calendar date.</description></item>
-        /// <item><description><c>Invalid sequence. Must be a 4-digit number between 0001 and 9999.</c>: The sequence portion is not within the valid range.</description></item>
-        /// </list>
-        /// </errors>
-        public (bool IsValid, List<string> Errors, string DebugInfo) ValidateBatchId(string batchId)
-        {
-            var errors = new List<string>();
+		IEnumerable<Dictionary<string, string>> ITransformer<Dictionary<string, string>, Dictionary<string, string>>.Transform(IEnumerable<Dictionary<string, string>> input)
+		{
+			return TransformData(input);
+		}
+	}
 
-            if (batchId.Length != 13 || batchId[8] != '-')
-                errors.Add("Invalid format. Expected yyyyMMdd-SSSS.");
+	// Loader for CSV files (skeleton)
+	public class Load : ILoader<Dictionary<string, string>>
+	{
+		public void SaveCsv(IEnumerable<Dictionary<string, string>> data, string filePath)
+		{
+			// TODO: Implement CSV loading logic
+			throw new NotImplementedException();
+		}
 
-            if (!DateTime.TryParseExact(batchId.Substring(0, 8), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-                errors.Add("Invalid date.");
+		void ILoader<Dictionary<string, string>>.Load(IEnumerable<Dictionary<string, string>> data, string filePath)
+		{
+			SaveCsv(data, filePath);
+		}
+	}
 
-            if (!int.TryParse(batchId.Substring(9), out var sequence) || sequence < 1 || sequence > 9999)
-                errors.Add("Invalid sequence. Must be a 4-digit number between 0001 and 9999.");
+	// Pipeline orchestrator (skeleton)
+	public class Pipeline
+	{
+		private readonly IExtractor<Dictionary<string, string>> _extractor;
+		private readonly ITransformer<Dictionary<string, string>, Dictionary<string, string>> _transformer;
+		private readonly ILoader<Dictionary<string, string>> _loader;
 
-            var debugInfo = $"Debugging ValidateBatchId: Errors = {string.Join(", ", errors)}";
+		public Pipeline(
+			IExtractor<Dictionary<string, string>> extractor,
+			ITransformer<Dictionary<string, string>, Dictionary<string, string>> transformer,
+			ILoader<Dictionary<string, string>> loader)
+		{
+			_extractor = extractor;
+			_transformer = transformer;
+			_loader = loader;
+		}
 
-            return (errors.Count == 0, errors.OrderBy(e => e).ToList(), debugInfo);
-        }
-
-        public string NormalizeBatchId(string batchId)
-        {
-            return batchId.ToUpperInvariant();
-        }
-
-        public List<Dictionary<string, object>> TransformData(List<Dictionary<string, object>> data)
-        {
-            return data.Select(row =>
-            {
-                var transformedRow = new Dictionary<string, object>(row);
-                if (row.ContainsKey("BatchId"))
-                {
-                    var batchIdObj = row["BatchId"];
-                    var batchIdStr = batchIdObj?.ToString() ?? string.Empty;
-                    transformedRow["BatchId"] = batchIdStr.ToUpper();
-                }
-                return transformedRow;
-            }).ToList();
-        }
-
-        public List<Dictionary<string, string>> TransformData(List<Dictionary<string, string>> data)
-        {
-            return data.Select(row =>
-            {
-                var transformedRow = new Dictionary<string, string>(row);
-                if (row.TryGetValue("BatchId", out var batchId) && !string.IsNullOrEmpty(batchId))
-                {
-                    transformedRow["BatchId"] = batchId.ToUpper();
-                }
-                return transformedRow;
-            }).ToList();
-        }
-    }
-
-    public class Load
-    {
-        public void SaveCsv(string filePath, List<Dictionary<string, string>> data)
-        {
-            if (string.IsNullOrWhiteSpace(filePath))
-                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
-
-            if (data == null || !data.Any())
-                throw new Exception("No data to save.");
-
-            var headers = data.First().Keys;
-            var lines = new List<string> { string.Join(",", headers) };
-
-            lines.AddRange(data.Select(row => string.Join(",", headers.Select(header => row[header]))));
-
-            File.WriteAllLines(filePath, lines);
-        }
-
-        public void SaveRejectReport(string filePath, List<string> rejectReport)
-        {
-            if (string.IsNullOrWhiteSpace(filePath))
-                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
-
-            File.WriteAllLines(filePath, rejectReport);
-        }
-
-        public void DisplayData(List<Dictionary<string, string>> data)
-        {
-            foreach (var row in data)
-            {
-                Console.WriteLine(string.Join(", ", row.Select(kv => $"{kv.Key}: {kv.Value}")));
-            }
-        }
-    }
-
-    public class Pipeline
-    {
-        private readonly Extract _extract;
-        private readonly Transform _transform;
-        private readonly Load _load;
-
-        public Pipeline()
-        {
-            _extract = new Extract();
-            _transform = new Transform();
-            _load = new Load();
-        }
-
-        public void Run(string inputFilePath, string outputFilePath, string rejectFilePath, string batchIdColumn)
-        {
-            Console.WriteLine("Starting ETL pipeline...");
-
-            Console.WriteLine("Extracting data...");
-            var data = _extract.LoadCsv(inputFilePath);
-
-            Console.WriteLine("Transforming data...");
-            var (validRows, rejectReport) = _transform.ProcessBatchId(data, batchIdColumn);
-
-            Console.WriteLine("Loading valid data...");
-            _load.SaveCsv(outputFilePath, validRows);
-
-            Console.WriteLine("Saving reject report...");
-            _load.SaveRejectReport(rejectFilePath, rejectReport);
-
-            Console.WriteLine("ETL pipeline completed.");
-        }
-
-        public void Run(string csvFilePath, string jsonFilePath)
-        {
-            var extract = new Extract();
-            var transform = new Transform();
-            var load = new Load();
-
-            // Load CSV data
-            var csvData = extract.LoadCsv(csvFilePath);
-
-            // Load JSON data
-            var jsonData = extract.LoadJSON(jsonFilePath);
-
-            // Transform and load data
-            var transformedCsvData = transform.TransformData(csvData);
-            var transformedJsonData = transform.TransformData(jsonData);
-
-            load.DisplayData(transformedCsvData);
-            load.DisplayData(transformedJsonData);
-        }
-    }
+		public void Run(string inputFilePath, string outputFilePath)
+		{
+			var extracted = _extractor.Extract(inputFilePath);
+			var transformed = _transformer.Transform(extracted);
+			_loader.Load(transformed, outputFilePath);
+		}
+	}
 }
