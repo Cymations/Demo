@@ -15,10 +15,13 @@ namespace ETL
             _loader = loader;
         }
 
-        public void Run(string inputPath)
+        public void Run(string inputPath, bool hasHeader = false)
         {
-            var extracted = _extractor.Extract(inputPath);
+            var extracted = _extractor.Extract(inputPath, hasHeader);
             var transformed = _transformer.Transform(extracted);
+            // propagate header if present
+            if (_extractor.Header != null)
+                transformed.Header = _extractor.Header;
             _loader.Load(new[] { transformed });
         }
     }

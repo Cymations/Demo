@@ -6,6 +6,7 @@ namespace ETL
     {
         public List<string[]> ValidRows { get; } = new();
         public List<(int RowNumber, string[] Row, string[] ErrorCodes)> InvalidRows { get; } = new();
+        public string[]? Header { get; set; }
     }
 
     public class CsvTransformer : ITransformer<IEnumerable<string[]>, CsvTransformResult>

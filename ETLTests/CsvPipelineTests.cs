@@ -1,17 +1,43 @@
+
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using CsvHelper;
-using CsvHelper.Configuration;
-using ETL;
 using Xunit;
+using ETL;
 
 namespace ETLTests
 {
     public class CsvPipelineTests
     {
+        [Fact]
+        public void CsvExtractor_ExtractsRows_WithHeader()
+        {
+            var csv = "col1,col2,col3\n1,2,3\n4,5,6";
+            var path = Path.GetTempFileName();
+            File.WriteAllText(path, csv);
+            var extractor = new CsvExtractor();
+            var rows = extractor.Extract(path, hasHeader: true).ToList();
+            Assert.Equal(new[] { "col1", "col2", "col3" }, extractor.Header);
+            Assert.Equal(new[] { "1", "2", "3" }, rows[0]);
+            Assert.Equal(new[] { "4", "5", "6" }, rows[1]);
+            File.Delete(path);
+        }
+
+        [Fact]
+        public void CsvExtractor_ExtractsRows_WithoutHeader()
+        {
+            var csv = "col1,col2,col3\n1,2,3\n4,5,6";
+            var path = Path.GetTempFileName();
+            File.WriteAllText(path, csv);
+            var extractor = new CsvExtractor();
+            var rows = extractor.Extract(path).ToList();
+            Assert.Null(extractor.Header);
+            Assert.Equal(new[] { "col1", "col2", "col3" }, rows[0]);
+            Assert.Equal(new[] { "1", "2", "3" }, rows[1]);
+            Assert.Equal(new[] { "4", "5", "6" }, rows[2]);
+            File.Delete(path);
+        }
+// (Usings already at the top, remove these duplicate lines)
         [Theory]
         [InlineData("20260406-0042", "20260406-0042")]
         [InlineData(" 20260406-0001 ", "20260406-0001")]
