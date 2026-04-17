@@ -39,7 +39,11 @@ namespace ETL
                 errors.Add("DATE");
             }
             // Validate sequence: must be 4 digits, 0001-9999
-            if (seqPart.Length != 4 || !int.TryParse(seqPart, out int seq) || seq < 1 || seq > 9999)
+            if (seqPart.Length != 4)
+            {
+                errors.Add("FORMAT");
+            }
+            else if (!int.TryParse(seqPart, out int seq) || seq < 1 || seq > 9999)
             {
                 errors.Add("SEQUENCE");
             }
