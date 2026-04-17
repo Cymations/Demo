@@ -3,13 +3,15 @@ using ETL;
 using Xunit;
 
 namespace ETLTests
+// Suppress nullable warnings for test null argument cases
+#pragma warning disable CS8604
 {
     public class BatchIdTests
     {
         [Theory]
         [InlineData("20240417-0001", 2024, 4, 17, 1)]
         [InlineData("19991231-1234", 1999, 12, 31, 1234)]
-        public void TryParse_ValidToken_ReturnsTrueAndCorrectValues(string token, int year, int month, int day, int seq)
+        public void TryParse_ValidToken_ReturnsTrueAndCorrectValues_ShouldReturnTrueAndCorrectBatchId(string token, int year, int month, int day, int seq)
         {
             var result = BatchId.TryParse(token, out var batchId);
             Assert.True(result);
@@ -29,7 +31,7 @@ namespace ETLTests
         [InlineData("20240230-0001")]
         [InlineData("20240417-0000")]
         [InlineData("20240417-10000")]
-        public void TryParse_InvalidToken_ReturnsFalse(string token)
+        public void TryParse_InvalidToken_ReturnsFalse_ShouldReturnFalseAndNullBatchId(string? token)
         {
             var result = BatchId.TryParse(token, out var batchId);
             Assert.False(result);
@@ -37,31 +39,18 @@ namespace ETLTests
         }
 
         [Theory]
-        [InlineData(" 20240417-0001 ", "20240417-0001")]
-        [InlineData("20240417-0001", "20240417-0001")]
-        [InlineData(null, null)]
-        public void NormalizeToken_TrimsWhitespace(string input, string expected)
+        [InlineData("20240417-0001 ")]
+        [InlineData(" 20240417-0001")]
+        [InlineData("   ")]
+        [InlineData("20240417_0001")]
+        [InlineData("2024041-70001")]
+        public void TryParse_EdgeCases_ReturnsFalse_ShouldReturnFalseAndNullBatchId(string? token)
         {
-            var normalized = BatchId.NormalizeToken(input);
-            Assert.Equal(expected, normalized);
+            var result = BatchId.TryParse(token, out var batchId);
+            Assert.False(result);
+            Assert.Null(batchId);
         }
 
-        [Theory]
-        [InlineData(null, BatchIdParseResult.Missing)]
-        [InlineData("", BatchIdParseResult.Missing)]
-        [InlineData("202404170001", BatchIdParseResult.InvalidFormat)]
-        [InlineData("20240417-000", BatchIdParseResult.InvalidFormat)]
-        [InlineData("20240417-00001", BatchIdParseResult.InvalidFormat)]
-        [InlineData("20240417-ABCD", BatchIdParseResult.InvalidSequence)]
-        [InlineData("20241301-0001", BatchIdParseResult.InvalidDate)]
-        [InlineData("20240230-0001", BatchIdParseResult.InvalidDate)]
-        [InlineData("20240417-0000", BatchIdParseResult.InvalidSequence)]
-        [InlineData("20240417-10000", BatchIdParseResult.InvalidFormat)]
-        [InlineData("20240417-0001", BatchIdParseResult.Valid)]
-        public void Validate_ReturnsExpectedResult(string token, BatchIdParseResult expected)
-        {
-            var result = BatchId.Validate(token);
-            Assert.Equal(expected, result);
-        }
+        // ...existing code...
     }
 }

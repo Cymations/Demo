@@ -14,15 +14,23 @@ namespace ETL
             Sequence = sequence;
         }
 
-        public static string NormalizeToken(string token)
+        /// <summary>
+        /// Returns the token if it contains no whitespace; otherwise returns null.
+        /// </summary>
+        /// <param name="token">The batch ID token to check.</param>
+        /// <returns>The original token if valid, otherwise null.</returns>
+        public static string? SanitizeToken(string? token)
         {
-            return token?.Trim();
+            // Reject if token contains any whitespace
+            if (token is null || token.Any(char.IsWhiteSpace))
+                return null;
+            return token;
         }
 
-        public static bool TryParse(string token, out BatchId batchId)
+        public static bool TryParse(string? token, out BatchId? batchId)
         {
             batchId = null;
-            token = NormalizeToken(token);
+            token = SanitizeToken(token);
             if (string.IsNullOrEmpty(token) || token.Length != 13 || token[8] != '-')
                 return false;
             var datePart = token.Substring(0, 8);

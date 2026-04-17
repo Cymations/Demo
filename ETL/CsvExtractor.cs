@@ -46,6 +46,9 @@ namespace ETL
                 throw new ArgumentNullException(nameof(filePath), "File path cannot be null or empty.");
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"File not found: {filePath}", filePath);
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length == 0)
+                throw new InvalidDataException($"File is empty: {filePath}");
 
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
