@@ -7,10 +7,16 @@ using ETL;
 
 namespace ETLTests
 {
+    /// <summary>
+    /// Contains unit tests for the CsvExtractor and BatchIdParser classes.
+    /// </summary>
     public class CsvPipelineTests
     {
+        /// <summary>
+        /// Tests that CsvExtractor correctly extracts rows and header when the CSV has a header row.
+        /// </summary>
         [Fact]
-        public void CsvExtractor_ExtractsRows_WithHeader()
+        public void Extract_WithHeader_ReturnsExpectedRows()
         {
             var csv = "col1,col2,col3\n1,2,3\n4,5,6";
             var path = Path.GetTempFileName();
@@ -23,8 +29,11 @@ namespace ETLTests
             File.Delete(path);
         }
 
+        /// <summary>
+        /// Tests that CsvExtractor correctly extracts rows when the CSV does not have a header row.
+        /// </summary>
         [Fact]
-        public void CsvExtractor_ExtractsRows_WithoutHeader()
+        public void Extract_WithoutHeader_ReturnsExpectedRows()
         {
             var csv = "col1,col2,col3\n1,2,3\n4,5,6";
             var path = Path.GetTempFileName();
@@ -38,10 +47,15 @@ namespace ETLTests
             File.Delete(path);
         }
 // (Usings already at the top, remove these duplicate lines)
+        /// <summary>
+        /// Tests that BatchIdParser.Validate returns IsValid true and the normalized value for valid batch IDs.
+        /// </summary>
+        /// <param name="input">The input batch ID string.</param>
+        /// <param name="expected">The expected normalized batch ID.</param>
         [Theory]
         [InlineData("20260406-0042", "20260406-0042")]
         [InlineData(" 20260406-0001 ", "20260406-0001")]
-        public void BatchIdParser_ValidInputs_Normalized(string input, string expected)
+        public void Validate_ValidBatchId_ReturnsNormalized(string input, string expected)
         {
             var result = BatchIdParser.Validate(input);
             Assert.True(result.IsValid);
@@ -49,13 +63,18 @@ namespace ETLTests
             Assert.Empty(result.ErrorCodes);
         }
 
+        /// <summary>
+        /// Tests that BatchIdParser.Validate returns IsValid false and the correct error codes for invalid batch IDs.
+        /// </summary>
+        /// <param name="input">The input batch ID string.</param>
+        /// <param name="expectedErrors">The expected error codes.</param>
         [Theory]
         [InlineData("20260406-42", new[] { "FORMAT" })]
         [InlineData("20261301-0001", new[] { "DATE" })]
         [InlineData("20260406-0000", new[] { "SEQUENCE" })]
         [InlineData("20260406-10000", new[] { "FORMAT" })]
         [InlineData("badformat", new[] { "FORMAT" })]
-        public void BatchIdParser_InvalidInputs_ErrorCodes(string input, string[] expectedErrors)
+        public void Validate_InvalidBatchId_ReturnsErrorCodes(string input, string[] expectedErrors)
         {
             var result = BatchIdParser.Validate(input);
             Assert.False(result.IsValid);

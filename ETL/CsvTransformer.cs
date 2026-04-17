@@ -2,6 +2,9 @@ using System.Collections.Generic;
 
 namespace ETL
 {
+    /// <summary>
+    /// Represents the result of transforming CSV data, including valid and invalid rows.
+    /// </summary>
     public class CsvTransformResult
     {
         public List<string[]> ValidRows { get; } = new();
@@ -9,14 +12,26 @@ namespace ETL
         public string[]? Header { get; set; }
     }
 
+    /// <summary>
+    /// Transforms CSV rows by validating batch IDs and separating valid/invalid rows.
+    /// </summary>
     public class CsvTransformer : ITransformer<IEnumerable<string[]>, CsvTransformResult>
     {
         private readonly int _batchIdColumnIndex;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CsvTransformer"/> class.
+        /// </summary>
+        /// <param name="batchIdColumnIndex">The index of the batch ID column.</param>
         public CsvTransformer(int batchIdColumnIndex)
         {
             _batchIdColumnIndex = batchIdColumnIndex;
         }
 
+        /// <summary>
+        /// Transforms the input CSV rows, validating batch IDs and separating valid and invalid rows.
+        /// </summary>
+        /// <param name="input">The input CSV rows.</param>
+        /// <returns>A <see cref="CsvTransformResult"/> containing valid and invalid rows.</returns>
         public CsvTransformResult Transform(IEnumerable<string[]> input)
         {
             var result = new CsvTransformResult();
